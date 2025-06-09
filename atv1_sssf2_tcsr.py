@@ -21,7 +21,12 @@ def SE2_theta(DthetaDeg):
 def point(x,y):
     return np.array([[x],[y],[1]])
 
-def translation():
+def translation(xi, yi, xf, yf):
+    H = SE2_xy(xf - xi, yf - yi)
+    P = point(0.5, 0.5)
+    return H @ P
+
+def translation_example():
     H12 = SE2_xy(1, 0.25)
     P1R2 = point(0.5, 0.5)
     P1R1 = H12 @ P1R2
@@ -34,7 +39,7 @@ def translation():
     pretty_matrix_multiplication(P2R2, H21, P2R1)
 
 
-def rotation():
+def rotation_example():
     H12 = SE2_xy(1, 0.25) @ SE2_theta(45)
     P3R2 = point(0.5, 0.5)
     P3R1 = H12 @ P3R2
@@ -47,8 +52,8 @@ def rotation():
 
 
 def main():
-    translation()
-    rotation()
+    translation_example()
+    rotation_example()
 
 if __name__ == '__main__':
     main()
