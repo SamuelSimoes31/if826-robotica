@@ -13,11 +13,25 @@ def fk(theta1,theta2):
     return x , y, mt.degrees(theta)
 
 def ik(x,y):
-    # se o ponto está dentro da área de atuação
-    # se ele tiver exatamente na borda da área de atuação (1 resposta)
-    # se ele está dentro da da borda (2 respostas)
+    xy_squared = x**2 + y**2
+    R_squared = (a1 + a2)**2
 
-    return theta1, theta2
+    # se o ponto está dentro da área de atuação
+    if xy_squared > R_squared:
+        return None, None
+
+    # se ele tiver exatamente na borda da área de atuação (1 resposta)
+    if xy_squared == R_squared:
+        theta1 = theta2 = mt.atan2(y, x)
+        return theta1, theta2
+
+    # se ele está dentro da da borda (2 respostas)
+    if xy_squared < R_squared:
+        theta2_a = mt.acos((x**2 + y**2 - a1**2 - a2**2) / (2 * a1 * a2))
+        theta2_b = -theta2_a
+        theta1_a = mt.atan2(y, x) - mt.atan2(a2 * mt.sin(theta2_a), a1 + a2 * mt.cos(theta2_a))
+        theta1_b = mt.atan2(y, x) + mt.atan2(a2 * mt.sin(theta2_b), a1 + a2 * mt.cos(theta2_b))
+        return theta1_a, theta2_a, theta1_b, theta2_b
 
 def main():
     print(fk(0,0))
