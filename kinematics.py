@@ -2,9 +2,10 @@ import math as mt
 from atv1_sssf2_tcsr import *
 from utils import imprimir_simples, plotar_series_temporais
 a1 = a2 = 1
-vmax = 1
-amax = 0.01
+vmax = 0.2
+amax = 0.1
 ts = 0.01
+v_modulo = 0.1
 
 def fk(theta1,theta2):
     E1 = SE2_theta(mt.degrees(theta1)) @ SE2_xy(a1, 0)
@@ -14,7 +15,8 @@ def fk(theta1,theta2):
     x = E[0,2]
     y = E[1,2]
     theta = mt.atan2(y, x)
-    return x , y, mt.degrees(theta)
+    return np.array([x, y])
+    # return x , y, mt.degrees(theta)
 
 def ik(x,y):
     xy_squared = x**2 + y**2
@@ -39,74 +41,109 @@ def ik(x,y):
         theta1_b = mt.atan2(y, x) - mt.atan2(a2 * mt.sin(theta2_b), a1 + a2 * mt.cos(theta2_b))
         return [(theta1_a, theta2_a), (theta1_b, theta2_b)]
 
-def inverse_jacobian(q1,q2):
-    return 1/(a1*a2*mt.sin(q2)) * np.array([[a2*mt.cos(q1 + q2), a2*mt.sin(q1 + q2)],
-                                            [-a1*mt.cos(q1) - a2*mt.cos(q1 + q2), -a1*mt.sin(q1) - a2*mt.sin(q1 + q2)]])
+# Jacobiano inverso (com verificação de singularidade)
+def inverse_jacobian(q1, q2):
+    sin_q2 = mt.sin(q2)
+    if abs(sin_q2) < 1e-6:
+        raise ValueError("Jacobian is singular (q2 ≈ 0), cannot invert.")
+    
+    denom = a1 * a2 * sin_q2
+    return (1 / denom) * np.array([
+        [a2 * mt.cos(q1 + q2), a2 * mt.sin(q1 + q2)],
+        [-a1 * mt.cos(q1) - a2 * mt.cos(q1 + q2), -a1 * mt.sin(q1) - a2 * mt.sin(q1 + q2)]
+    ])
 
-def traj_joint(theta1_init,theta2_init, theta1_final,theta2_final):
+# Função principal da trajetória
+def traj_joint(theta1_init, theta2_init, theta1_final, theta2_final):
+    # Conversão para radianos
     theta1_init = mt.radians(theta1_init)
     theta2_init = mt.radians(theta2_init)
     theta1_final = mt.radians(theta1_final)
     theta2_final = mt.radians(theta2_final)
 
-    v = np.array([0 , 0])
-    v_max = np.array([vmax , vmax])
-    a = np.array([amax , amax])
-    q = np.array([[theta1_init,theta2_init]])
+    # Inicialização
+    q = np.array([[theta1_init, theta2_init]])
+    q_dot_list = []
+    q_ddot_list = []
 
-    # fase 1: aceleração
-    while q[-1][0] < theta1_final and v[0] < v_max[0]:
-        J_inv = inverse_jacobian(q[-1][0], q[-1][1])
+    # Trajetória cartesiana (reta no espaço)
+    p_start = fk(theta1_init, theta2_init)
+    p_end = fk(theta1_final, theta2_final)
+    s_total = np.linalg.norm(p_end - p_start)
+
+    # Perfil trapezoidal
+    t_acc = vmax / amax
+    s_acc = 0.5 * amax * t_acc**2
+
+    if 2 * s_acc >= s_total:
+        # Perfil triangular
+        t_acc = (s_total / amax)**0.5
+        t_const = 0
+        v_peak = amax * t_acc
+    else:
+        # Perfil trapezoidal
+        s_const = s_total - 2 * s_acc
+        t_const = s_const / vmax
+        v_peak = vmax
+
+    t_total = 2 * t_acc + t_const
+    t = 0
+    s_traj = 0
+
+    while q[-1][0] < theta1_final and t < t_total + ts:
+        q1, q2 = q[-1]
+
+        # Posição atual
+        p1 = fk(q1, q2)
+        p2 = fk(q1 + 0.001, q2)
+        v_unit = (p2 - p1)
+        v_unit /= np.linalg.norm(v_unit)
+
+        # Perfil trapezoidal: calcula v_modulo e a_modulo
+        if t < t_acc:
+            v_modulo = amax * t
+            a_modulo = amax
+        elif t < t_acc + t_const:
+            v_modulo = v_peak
+            a_modulo = 0
+        elif t < t_total:
+            v_modulo = v_peak - amax * (t - t_acc - t_const)
+            a_modulo = -amax
+        else:
+            v_modulo = 0
+            a_modulo = 0
+
+        v = v_unit * v_modulo
+        a = v_unit * a_modulo
+
+        try:
+            J_inv = inverse_jacobian(q1, q2)
+        except ValueError as e:
+            print("Erro no Jacobiano:", e)
+            break
+
         q_dot = J_inv @ v
-        next_q = q[-1] + q_dot*ts
-        q = np.vstack((q, next_q))
-        v = v + a*ts
-    q_phase1 = q[-1].copy()
-    v_max = np.array([vmax , vmax])
+        q_ddot = J_inv @ a
 
-    # fase 2: velocidade constante
-    while q[-1][0] < theta1_final and theta1_final - q[-1][0] < q_phase1[0]:
-        J_inv = inverse_jacobian(q[-1][0], q[-1][1])
-        q_dot = J_inv @ v_max
-        next_q = q[-1] + q_dot*ts
+        q_dot_list.append(q_dot)
+        q_ddot_list.append(q_ddot)
+
+        # Integração
+        next_q = q[-1] + q_dot * ts
         q = np.vstack((q, next_q))
 
-    # fase 3: desaceleração
-    while q[-1][0] < theta1_final:
-        J_inv = inverse_jacobian(q[-1][0], q[-1][1])
-        q_dot = J_inv @ v
-        next_q = q[-1] + q_dot*ts
-        q = np.vstack((q, next_q))
-        v = v - a*ts
+        s_traj += v_modulo * ts
+        t += ts
 
-    return q #sequencia de theta1 e theta2
+    return q, np.array(q_dot_list), np.array(q_ddot_list)
 
 def main():
-    # print(fk(0,0))
-    # print(fk(mt.pi/2, 0))
-    # print(fk(0,mt.pi/2))
-    # print(fk(mt.pi/2,mt.pi/2))
-
-    # test_points = [
-    #     (1, 1),
-    #     (1, -1),
-    #     (-1, 1),
-    #     (-1, -1),
-    #     (2, 1),
-    #     (2, 0),
-    #     (0, 2),
-    #     (-2, 0)
-    # ]
-
-    # print("Testing ik(x, y) for various points:")
-    # for x, y in test_points:
-    #     result = ik(x, y)
-    #     print(f"ik({x}, {y}) = {result}")
-
-    q = traj_joint(0, 90, 180, 0)
+    q, q_dot_list, q_ddot_list = traj_joint(0, 50, 120, 90)
     q_deg = np.rad2deg(q)
-    imprimir_simples(q_deg)
+
     plotar_series_temporais(q_deg)
+    plotar_series_temporais(q_dot_list)
+    plotar_series_temporais(q_ddot_list)
 
 if __name__ == '__main__':
     main()
