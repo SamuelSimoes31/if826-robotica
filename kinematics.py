@@ -4,7 +4,7 @@ from utils import plotar_series_temporais_completo, plotar_series_temporais
 
 a1 = a2 = 1
 ts = 0.01
-vmax = 50  # graus/s
+vmax = 75  # graus/s
 amax = 100  # graus/s^2
 
 
@@ -68,7 +68,7 @@ def inverse_jacobian(q1, q2):
 
 # angulos em radianos
 def traj_joint_single_axis_params(theta_init, theta_final, v_max, a_max):
-    s_total = theta_final - theta_init
+    s_total = abs(theta_final - theta_init)
     # s_total = mt.radians(theta_final - theta_init)
     # v_max = mt.radians(v_max)
     # a_max = mt.radians(a_max)
@@ -212,7 +212,7 @@ def traj_joint(theta1_init, theta2_init, theta1_final, theta2_final):
 
 
 def main():
-    q_traj, v_traj, a_traj, t_traj = traj_joint(0, 0, -90, -120)
+    q_traj, v_traj, a_traj, t_traj = traj_joint(300, 0, 30, 1)
 
     print(f"Movimento concluído em {t_traj[-1]:.2f} segundos.")
     plotar_series_temporais_completo(q_traj, v_traj, a_traj, t_traj)
