@@ -1,11 +1,10 @@
 import math as mt
 from atv1_sssf2_tcsr import *
-from utils import imprimir_simples, plotar_series_temporais
+from utils import plotar_series_temporais_completo, plotar_series_temporais
 a1 = a2 = 1
-vmax = 0.2
-amax = 0.1
 ts = 0.01
-v_modulo = 0.1
+vmax = 10  #graus/s
+amax = 5  # graus/s^2
 
 def fk(theta1,theta2):
     E1 = SE2_theta(mt.degrees(theta1)) @ SE2_xy(a1, 0)
@@ -46,104 +45,166 @@ def inverse_jacobian(q1, q2):
     sin_q2 = mt.sin(q2)
     if abs(sin_q2) < 1e-6:
         raise ValueError("Jacobian is singular (q2 ≈ 0), cannot invert.")
-    
+
     denom = a1 * a2 * sin_q2
     return (1 / denom) * np.array([
         [a2 * mt.cos(q1 + q2), a2 * mt.sin(q1 + q2)],
         [-a1 * mt.cos(q1) - a2 * mt.cos(q1 + q2), -a1 * mt.sin(q1) - a2 * mt.sin(q1 + q2)]
     ])
 
-# Função principal da trajetória
-def traj_joint(theta1_init, theta2_init, theta1_final, theta2_final):
-    # Conversão para radianos
-    theta1_init = mt.radians(theta1_init)
-    theta2_init = mt.radians(theta2_init)
-    theta1_final = mt.radians(theta1_final)
-    theta2_final = mt.radians(theta2_final)
+# angulos em radianos
+def traj_joint_single_axis_params(theta_init, theta_final, v_max, a_max):
+    s_total = theta_final - theta_init
+    # s_total = mt.radians(theta_final - theta_init)
+    # v_max = mt.radians(v_max)
+    # a_max = mt.radians(a_max)
 
-    # Inicialização
-    q = np.array([[theta1_init, theta2_init]])
-    q_dot_list = []
-    q_ddot_list = []
+    t_acc_ideal = v_max / a_max
+    s_acc_ideal = 0.5 * a_max * t_acc_ideal**2
 
-    # Trajetória cartesiana (reta no espaço)
-    p_start = fk(theta1_init, theta2_init)
-    p_end = fk(theta1_final, theta2_final)
-    s_total = np.linalg.norm(p_end - p_start)
-
-    # Perfil trapezoidal
-    t_acc = vmax / amax
-    s_acc = 0.5 * amax * t_acc**2
-
-    if 2 * s_acc >= s_total:
-        # Perfil triangular
-        t_acc = (s_total / amax)**0.5
-        t_const = 0
-        v_peak = amax * t_acc
-    else:
-        # Perfil trapezoidal
+    # Caso 1: Perfil Trapezoidal (atinge v_max)
+    if 2 * s_acc_ideal <= s_total:
+        t_acc = t_acc_ideal
+        s_acc = s_acc_ideal
         s_const = s_total - 2 * s_acc
-        t_const = s_const / vmax
-        v_peak = vmax
+        t_const = s_const / v_max
+        v_peak = v_max
+    # Caso 2: Perfil Triangular (não atinge v_max)
+    else:
+        t_acc = (s_total / a_max)**0.5
+        s_acc = 0.5 * a_max * t_acc**2
+        t_const = 0
+        s_const = 0
+        v_peak = a_max * t_acc
 
     t_total = 2 * t_acc + t_const
-    t = 0
-    s_traj = 0
 
-    while q[-1][0] < theta1_final and t < t_total + ts:
-        q1, q2 = q[-1]
+    return {
+        't_acc': t_acc,
+        's_acc': s_acc,
+        't_const': t_const,
+        's_const': s_const,
+        't_total': t_total,
+        's_total': s_total,
+        'v_peak': v_peak,
+    }
 
-        # Posição atual
-        p1 = fk(q1, q2)
-        p2 = fk(q1 + 0.001, q2)
-        v_unit = (p2 - p1)
-        v_unit /= np.linalg.norm(v_unit)
+# def traj_joint_single_axis_sync(theta_init, theta_final, v_max, a_max, t_sync):
+#     s_total = all_params[i]['s_total']
+#             a_max = amax_j[i]
+            
+#             # Resolve v_peak^2 - v_peak*a*T_sync + a*s_total = 0
+#             discriminant = (a_max * T_sync)**2 - 4 * a_max * s_total
+#             v_peak_adj = (a_max * T_sync - np.sqrt(discriminant)) / 2.0
+            
+#             t_acc_adj = v_peak_adj / a_max
+#             t_const_adj = T_sync - 2 * t_acc_adj
+            
+#             adjusted_params.append({'t_acc': t_acc_adj, 't_const': t_const_adj, 'v_peak': v_peak_adj})
 
-        # Perfil trapezoidal: calcula v_modulo e a_modulo
-        if t < t_acc:
-            v_modulo = amax * t
-            a_modulo = amax
-        elif t < t_acc + t_const:
-            v_modulo = v_peak
-            a_modulo = 0
-        elif t < t_total:
-            v_modulo = v_peak - amax * (t - t_acc - t_const)
-            a_modulo = -amax
+# Função principal da trajetória
+def traj_joint(theta1_init, theta2_init, theta1_final, theta2_final):
+    q_init = np.radians([theta1_init, theta2_init])
+    q_final = np.radians([theta1_final, theta2_final])
+    vmax_j = np.radians([vmax, vmax])
+    amax_j = np.radians([amax, amax])
+
+    # ângulo está aumentando ou diminuindo?
+    directions = np.sign(q_final - q_init)
+
+    # 1. Calcular perfis individuais para cada junta
+    params1 = traj_joint_single_axis_params(q_init[0], q_final[0], vmax_j[0], amax_j[0])
+    params2 = traj_joint_single_axis_params(q_init[1], q_final[1], vmax_j[1], amax_j[1])
+
+    # 2. Encontrar o tempo de sincronização (a junta limitante)
+    T_sync = max(params1['t_total'], params2['t_total'])
+
+    if T_sync == 0: # Se não há movimento
+        return np.array([q_init]), np.array([[0,0]]), np.array([[0,0]]), np.array([0])
+
+    # 3. Recalcular os parâmetros da(s) junta(s) mais rápida(s) para que durem T_sync
+    all_params = [params1, params2]
+    adjusted_params = []
+    for i in range(2):
+        if all_params[i]['t_total'] < T_sync:
+            # Esta junta precisa ser desacelerada. Recalculamos sua v_peak.
+            s_total = all_params[i]['s_total']
+            a_max = amax_j[i]
+            
+            # Resolve v_peak^2 - v_peak*a*T_sync + a*s_total = 0
+            discriminant = (a_max * T_sync)**2 - 4 * a_max * s_total
+            v_peak_adj = (a_max * T_sync - np.sqrt(discriminant)) / 2.0
+            
+            t_acc_adj = v_peak_adj / a_max
+            t_const_adj = T_sync - 2 * t_acc_adj
+            
+            adjusted_params.append({'t_acc': t_acc_adj, 't_const': t_const_adj, 'v_peak': v_peak_adj})
         else:
-            v_modulo = 0
-            a_modulo = 0
+            # Esta é a junta limitante, usamos seus parâmetros originais
+            adjusted_params.append(all_params[i])
 
-        v = v_unit * v_modulo
-        a = v_unit * a_modulo
+    # 4. Gerar os pontos da trajetória com os parâmetros sincronizados
+    time_points = np.arange(0, T_sync, ts)
+    q_traj, v_traj, a_traj = [], [], []
 
-        try:
-            J_inv = inverse_jacobian(q1, q2)
-        except ValueError as e:
-            print("Erro no Jacobiano:", e)
-            break
+    for t in time_points:
+        q_t, v_t, a_t = [], [], []
+        for i in range(2):
+            p = adjusted_params[i]
+            direction = directions[i]
+            q0 = q_init[i]
+            a_max = amax_j[i]
+            
+            t_acc = p['t_acc']
+            t_const = p['t_const']
+            v_peak = p['v_peak']
+            
+            # Fase 1: Aceleração
+            if t <= t_acc:
+                accel = a_max * direction
+                vel = accel * t
+                pos = q0 + 0.5 * accel * t**2
+            # Fase 3: Desaceleração
+            elif t > t_acc + t_const:
+                accel = -a_max * direction
+                t_in_phase = t - (t_acc + t_const)
+                # Posição e velocidade no início da desaceleração
+                pos_start_d = q0 + direction * (0.5 * a_max * t_acc**2 + v_peak * t_const)
+                vel_start_d = v_peak * direction
+                vel = vel_start_d + accel * t_in_phase
+                pos = pos_start_d + (vel_start_d * t_in_phase) + (0.5 * accel * t_in_phase**2)
+            # Fase 2: Velocidade Constante
+            else:
+                accel = 0
+                vel = v_peak * direction
+                t_in_phase = t - t_acc
+                pos_start_c = q0 + direction * (0.5 * a_max * t_acc**2)
+                pos = pos_start_c + vel * t_in_phase
+            
+            q_t.append(pos)
+            v_t.append(vel)
+            a_t.append(accel)
+            
+        q_traj.append(q_t)
+        v_traj.append(v_t)
+        a_traj.append(a_t)
+        
+    # Adicionar o ponto final para garantir precisão
+    q_traj.append(q_final.tolist())
+    v_traj.append([0.0, 0.0])
+    a_traj.append([0.0, 0.0])
+    time_points = np.append(time_points, T_sync)
 
-        q_dot = J_inv @ v
-        q_ddot = J_inv @ a
+    return np.array(q_traj), np.array(v_traj), np.array(a_traj), time_points
 
-        q_dot_list.append(q_dot)
-        q_ddot_list.append(q_ddot)
-
-        # Integração
-        next_q = q[-1] + q_dot * ts
-        q = np.vstack((q, next_q))
-
-        s_traj += v_modulo * ts
-        t += ts
-
-    return q, np.array(q_dot_list), np.array(q_ddot_list)
 
 def main():
-    q, q_dot_list, q_ddot_list = traj_joint(0, 50, 120, 90)
-    q_deg = np.rad2deg(q)
+    
 
-    plotar_series_temporais(q_deg)
-    plotar_series_temporais(q_dot_list)
-    plotar_series_temporais(q_ddot_list)
+    q_traj, v_traj, a_traj, t_traj = traj_joint(0, 50, 120, 90) # Junta 1: 120 graus; Junta 2: 10 graus
+    
+    print(f"Movimento concluído em {t_traj[-1]:.2f} segundos.")
+    plotar_series_temporais_completo(q_traj, v_traj, a_traj, t_traj)
 
 if __name__ == '__main__':
     main()

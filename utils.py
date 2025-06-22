@@ -80,3 +80,35 @@ def plotar_series_temporais(matriz: np.ndarray):
     
     # Exibe o gráfico
     plt.show()
+    
+
+def plotar_series_temporais_completo(q, v, a, t):
+    """Sua função de plotar melhorada."""
+    q_deg = np.rad2deg(q)
+    v_deg = np.rad2deg(v)
+    a_deg = np.rad2deg(a)
+    
+    fig, axs = plt.subplots(3, 1, figsize=(10, 12), sharex=True)
+    fig.suptitle('Perfil da Trajetória Sincronizada no Espaço de Juntas', fontsize=16)
+
+    axs[0].plot(t, q_deg[:, 0], label='Junta 1 (q1)')
+    axs[0].plot(t, q_deg[:, 1], label='Junta 2 (q2)', linestyle='--')
+    axs[0].set_ylabel('Posição (graus)')
+    axs[0].legend()
+    axs[0].grid(True)
+
+    axs[1].plot(t, v_deg[:, 0], label='Junta 1 (v1)')
+    axs[1].plot(t, v_deg[:, 1], label='Junta 2 (v2)', linestyle='--')
+    axs[1].set_ylabel('Velocidade (graus/s)')
+    axs[1].legend()
+    axs[1].grid(True)
+
+    axs[2].plot(t, a_deg[:, 0], label='Junta 1 (a1)')
+    axs[2].plot(t, a_deg[:, 1], label='Junta 2 (a2)', linestyle='--')
+    axs[2].set_ylabel('Aceleração (graus/s²)')
+    axs[2].set_xlabel('Tempo (s)')
+    axs[2].legend()
+    axs[2].grid(True)
+    
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    plt.show()
