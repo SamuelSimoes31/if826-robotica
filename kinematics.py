@@ -8,6 +8,9 @@ vmax = 75  # graus/s
 amax = 100  # graus/s^2
 
 
+vmax = mt.radians(vmax)
+amax = mt.radians(amax)
+
 def fk(theta1, theta2):
     E1 = SE2_theta(mt.degrees(theta1)) @ SE2_xy(a1, 0)
     E2 = SE2_theta(mt.degrees(theta2)) @ SE2_xy(a2, 0)
@@ -69,9 +72,6 @@ def inverse_jacobian(q1, q2):
 # angulos em radianos
 def traj_joint_single_axis_params(theta_init, theta_final, v_max, a_max):
     s_total = abs(theta_final - theta_init)
-    # s_total = mt.radians(theta_final - theta_init)
-    # v_max = mt.radians(v_max)
-    # a_max = mt.radians(a_max)
 
     t_acc_ideal = v_max / a_max
     s_acc_ideal = 0.5 * a_max * t_acc_ideal**2
@@ -119,10 +119,10 @@ def traj_joint_single_axis_sync(params, a_max, t_sync):
 
 # Função principal da trajetória
 def traj_joint(theta1_init, theta2_init, theta1_final, theta2_final):
-    q_init = np.radians([theta1_init, theta2_init])
-    q_final = np.radians([theta1_final, theta2_final])
-    vmax_j = np.radians([vmax, vmax])
-    amax_j = np.radians([amax, amax])
+    q_init = np.array([theta1_init, theta2_init])
+    q_final = np.array([theta1_final, theta2_final])
+    vmax_j = np.array([vmax, vmax])
+    amax_j = np.array([amax, amax])
 
     # ângulo está aumentando ou diminuindo?
     directions = np.sign(q_final - q_init)
@@ -212,7 +212,9 @@ def traj_joint(theta1_init, theta2_init, theta1_final, theta2_final):
 
 
 def main():
-    q_traj, v_traj, a_traj, t_traj = traj_joint(300, 0, 30, 1)
+    theta1 = np.radians([0, 45])
+    theta2 = np.radians([0, -45])
+    q_traj, v_traj, a_traj, t_traj = traj_joint(theta1[0], theta2[0], theta1[1], theta2[1])
 
     print(f"Movimento concluído em {t_traj[-1]:.2f} segundos.")
     plotar_series_temporais_completo(q_traj, v_traj, a_traj, t_traj)
