@@ -7,6 +7,8 @@ ts = 0.01
 vmax = 75  # graus/s
 amax = 100  # graus/s^2
 
+vmax_euclidean = 2.5 # m/s
+amax_euclidean = 12.5 # m/s^2
 
 vmax = mt.radians(vmax)
 amax = mt.radians(amax)
@@ -35,7 +37,7 @@ def ik(x, y):
     if xy_squared == R_squared:
         theta1 = mt.atan2(y, x)
         theta2 = 0.0
-        return [(theta1, theta2)]
+        return [[theta1, theta2]]
 
     # se ele está dentro da da borda (2 respostas)
     if xy_squared < R_squared:
@@ -48,7 +50,7 @@ def ik(x, y):
         theta1_b = mt.atan2(y, x) - mt.atan2(
             a2 * mt.sin(theta2_b), a1 + a2 * mt.cos(theta2_b)
         )
-        return [(theta1_a, theta2_a), (theta1_b, theta2_b)]
+        return [[theta1_a, theta2_a], [theta1_b, theta2_b]]
 
 
 # Jacobiano inverso (com verificação de singularidade)
@@ -69,9 +71,8 @@ def inverse_jacobian(q1, q2):
     )
 
 
-# angulos em radianos
-def traj_joint_single_axis_params(theta_init, theta_final, v_max, a_max):
-    s_total = abs(theta_final - theta_init)
+def calculate_trajectory_params(init, final, v_max, a_max):
+    s_total = abs(final - init)
 
     t_acc_ideal = v_max / a_max
     s_acc_ideal = 0.5 * a_max * t_acc_ideal**2
@@ -128,8 +129,8 @@ def traj_joint(theta1_init, theta2_init, theta1_final, theta2_final):
     directions = np.sign(q_final - q_init)
 
     # 1. Calcular perfis individuais para cada junta
-    params1 = traj_joint_single_axis_params(q_init[0], q_final[0], vmax_j[0], amax_j[0])
-    params2 = traj_joint_single_axis_params(q_init[1], q_final[1], vmax_j[1], amax_j[1])
+    params1 = calculate_trajectory_params(q_init[0], q_final[0], vmax_j[0], amax_j[0])
+    params2 = calculate_trajectory_params(q_init[1], q_final[1], vmax_j[1], amax_j[1])
 
     # 2. Encontrar o tempo de sincronização (a junta limitante)
     t_sync = max(params1["t_total"], params2["t_total"])
@@ -201,107 +202,61 @@ def traj_joint(theta1_init, theta2_init, theta1_final, theta2_final):
 
     return np.array(q_traj)
 
-def traj_joint_full_profile(theta1_init, theta2_init, theta1_final, theta2_final):
-    q_init = np.array([theta1_init, theta2_init])
-    q_final = np.array([theta1_final, theta2_final])
-    vmax_j = np.array([vmax, vmax])
-    amax_j = np.array([amax, amax])
+def traj_euclidean(x_init, y_init, x_final, y_final):
+    s_total = np.sqrt((x_final - x_init)**2 + (y_final - y_init)**2)
+    direction = np.array([x_final - x_init, y_final - y_init])
+    direction = direction / s_total
+    q_init = ik(x_init, y_init)
+    if q_init is None:
+        raise ValueError("Ponto inicial fora da área de atuação")
+    q_final = ik(x_final, y_final)
+    if q_final is None:
+        print("Ponto final fora da área de atuação")
+    q_init = q_init[0] # primeira solução
+    q_final = q_final[0] # primeira solução
 
-    # ângulo está aumentando ou diminuindo?
-    directions = np.sign(q_final - q_init)
+    params = calculate_trajectory_params(0, s_total, vmax_euclidean, amax_euclidean)
+    t_acc = params["t_acc"]
+    t_const = params["t_const"]
+    v_peak = params["v_peak"]
+    a_max = amax_euclidean
+    
+    print(params["t_total"])
+    
 
-    # 1. Calcular perfis individuais para cada junta
-    params1 = traj_joint_single_axis_params(q_init[0], q_final[0], vmax_j[0], amax_j[0])
-    params2 = traj_joint_single_axis_params(q_init[1], q_final[1], vmax_j[1], amax_j[1])
+    time_points = np.arange(0, params["t_total"], ts)
+    q_traj = [[q_init[0], q_init[1]]]
 
-    # 2. Encontrar o tempo de sincronização (a junta limitante)
-    t_sync = max(params1["t_total"], params2["t_total"])
-
-    if t_sync == 0:  # Se não há movimento
-        return np.array([q_init]), np.array([[0, 0]]), np.array([[0, 0]]), np.array([0])
-
-    # 3. Recalcular os parâmetros da(s) junta(s) mais rápida(s) para que durem t_sync
-    all_params = [params1, params2]
-    adjusted_params = []
-    for i in range(2):
-        if all_params[i]["t_total"] < t_sync:
-            # Esta junta precisa ser desacelerada. Recalculamos sua v_peak.
-            adjusted_params.append(
-                traj_joint_single_axis_sync(all_params[i], amax_j[i], t_sync)
-            )
-        else:
-            # Esta é a junta limitante, usamos seus parâmetros originais
-            adjusted_params.append(all_params[i])
-
-    # 4. Gerar os pontos da trajetória com os parâmetros sincronizados
-    time_points = np.arange(0, t_sync, ts)
-    q_traj, v_traj, a_traj = [], [], []
 
     for t in time_points:
-        q_t, v_t, a_t = [], [], []
-        for i in range(2):
-            p = adjusted_params[i]
-            direction = directions[i]
-            q0 = q_init[i]
-            a_max = amax_j[i]
+        # Fase 1: Aceleração
+        if t <= t_acc:
+            accel = a_max
+            vel_mag = accel * t
+            vel_j = vel_mag * direction
+        # Fase 3: Desaceleração
+        elif t > t_acc + t_const:
+            accel = -a_max
+            t_in_phase = t - (t_acc + t_const)
+            # Posição e velocidade no início da desaceleração
+            vel_mag = accel * t_in_phase
+            vel_j = vel_mag * direction
+        # Fase 2: Velocidade Constante
+        else:
+            accel = 0
+            vel_mag = v_peak
+            vel_j = vel_mag * direction
 
-            t_acc = p["t_acc"]
-            t_const = p["t_const"]
-            v_peak = p["v_peak"]
+        inv_j = inverse_jacobian(q_traj[-1][0], q_traj[-1][1])
+        q_dot = inv_j @ vel_j
+        q = q_traj[-1] + q_dot * ts
+        q_traj.append(q)
 
-            # Fase 1: Aceleração
-            if t <= t_acc:
-                accel = a_max * direction
-                vel = accel * t
-                pos = q0 + 0.5 * accel * t**2
-            # Fase 3: Desaceleração
-            elif t > t_acc + t_const:
-                accel = -a_max * direction
-                t_in_phase = t - (t_acc + t_const)
-                # Posição e velocidade no início da desaceleração
-                pos_start_d = q0 + direction * (
-                    0.5 * a_max * t_acc**2 + v_peak * t_const
-                )
-                vel_start_d = v_peak * direction
-                vel = vel_start_d + accel * t_in_phase
-                pos = (
-                    pos_start_d
-                    + (vel_start_d * t_in_phase)
-                    + (0.5 * accel * t_in_phase**2)
-                )
-            # Fase 2: Velocidade Constante
-            else:
-                accel = 0
-                vel = v_peak * direction
-                t_in_phase = t - t_acc
-                pos_start_c = q0 + direction * (0.5 * a_max * t_acc**2)
-                pos = pos_start_c + vel * t_in_phase
-
-            q_t.append(pos)
-            v_t.append(vel)
-            a_t.append(accel)
-
-        q_traj.append(q_t)
-        v_traj.append(v_t)
-        a_traj.append(a_t)
-
-    # Adicionar o ponto final para garantir precisão
-    q_traj.append(q_final.tolist())
-    v_traj.append([0.0, 0.0])
-    a_traj.append([0.0, 0.0])
-    time_points = np.append(time_points, t_sync)
-
-    return np.array(q_traj), np.array(v_traj), np.array(a_traj), time_points
-
+    return np.array(q_traj)
 
 def main():
-    theta1 = np.radians([0, 45])
-    theta2 = np.radians([0, -45])
-    q_traj, v_traj, a_traj, t_traj = traj_joint_full_profile(theta1[0], theta2[0], theta1[1], theta2[1])
-
-    print(f"Movimento concluído em {t_traj[-1]:.2f} segundos.")
-    plotar_series_temporais_completo(q_traj, v_traj, a_traj, t_traj)
-
+    q_traj = traj_euclidean(0.2, 0, 0.8, 0)
+    # print(q_traj)
 
 if __name__ == "__main__":
     main()
