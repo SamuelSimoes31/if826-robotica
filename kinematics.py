@@ -3,9 +3,10 @@ from atv1_sssf2_tcsr import *
 from utils import plotar_series_temporais_completo, plotar_series_temporais
 
 a1 = a2 = 1
-ts = 0.01
-vmax = 75  # graus/s
-amax = 100  # graus/s^2
+ts = 0.1
+vmax = 10  # graus/s
+amax = 10  # graus/s^2
+ds = 0.01
 
 vmax_euclidean = 2.5 # m/s
 amax_euclidean = 12.5 # m/s^2
@@ -202,7 +203,7 @@ def traj_joint(theta1_init, theta2_init, theta1_final, theta2_final):
 
     return np.array(q_traj)
 
-def traj_euclidean(x_init, y_init, x_final, y_final):
+def traj_euclidean_old(x_init, y_init, x_final, y_final):
     s_total = np.sqrt((x_final - x_init)**2 + (y_final - y_init)**2)
     direction = np.array([x_final - x_init, y_final - y_init])
     direction = direction / s_total
@@ -226,6 +227,8 @@ def traj_euclidean(x_init, y_init, x_final, y_final):
 
     time_points = np.arange(0, params["t_total"], ts)
     q_traj = [[q_init[0], q_init[1]]]
+    v_traj = [[0,0]]
+    a_traj = [[a_max, a_max]]
 
 
     for t in time_points:
@@ -251,12 +254,54 @@ def traj_euclidean(x_init, y_init, x_final, y_final):
         q_dot = inv_j @ vel_j
         q = q_traj[-1] + q_dot * ts
         q_traj.append(q)
+        v_traj.append(vel_j)
+        a_traj.append(accel)
 
-    return np.array(q_traj)
+    return np.array(q_traj), v_traj, a_traj
 
+def traj_euclidean(x_init, y_init, x_final, y_final):
+    init_final = [[x_init, x_final], [y_init, y_final]]
+    dist_axis = [abs(x_final - x_init), abs(y_final - y_init)]
+    dist_sync = max(dist_axis[0], dist_axis[1])
+    xy = []
+
+    print('dist_sync', dist_sync)
+
+    for i in range(2):
+        print(f'dist_axis[{i}]: {dist_axis[i]}')
+        if dist_axis[i] == dist_sync:
+            arr = np.arange(init_final[i][0], init_final[i][1],ds)
+            xy.append(arr)
+        else:
+            if dist_axis[i] == 0:
+                arr = np.empty(int(np.ceil(dist_sync/ds)))
+                arr.fill(init_final[i][0])
+                xy.append(arr)
+            else:
+                ds_sync = (dist_axis[i] * ds) / dist_axis[0 if i == 1 else 1]
+                xy.append(np.arange(init_final[i][0], init_final[i][1],ds_sync))
+
+    q = []
+    print('xy',xy)
+    for i in range(len(xy[0])):
+        sol = ik(xy[0][i],xy[1][i])
+        print(sol)
+        if sol == None:
+            raise ValueError("Fora da área")
+        sol = sol[0]
+        q.append(sol) 
+    
+    print('q',q)
+
+    return np.array(q)
+    
 def main():
+    # theta1 = np.radians([0, 45])
+    # theta2 = np.radians([0, 90])
+    # q_traj,v,a,t = traj_joint_full_profile(theta1[0], theta2[0], theta1[1], theta2[1])
+    # plotar_series_temporais_completo(q_traj,v,a,t)
     q_traj = traj_euclidean(0.2, 0, 0.8, 0)
-    # print(q_traj)
+    print(q_traj)
 
 if __name__ == "__main__":
     main()
