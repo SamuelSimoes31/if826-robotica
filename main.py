@@ -8,7 +8,9 @@ from utils import plot_trajectory_euclidean, plotar_series_temporais_completo
 robot = rtb.models.DH.Planar2()
 
 # trajetória no espaço de configuração
-q_traj_eucl, pos_traj_eucl, t_traj_eucl = traj_eucl(0, -1.5, 0.4, 0, ds=0.01)
+initial_pos = [0, -1.5]
+final_pos = [0.4, 0]
+q_traj_eucl, pos_traj_eucl, t_traj_eucl = traj_eucl(initial_pos[0], initial_pos[1], final_pos[0], final_pos[1], ds=0.01)
 plot_trajectory_euclidean(pos_traj_eucl, q_traj_eucl, t_traj_eucl)
 robot.plot(q_traj_eucl, backend='pyplot', movie='cartesiano_eucl.gif', dt=0.01)
 

@@ -100,6 +100,7 @@ def plotar_series_temporais_completo(q, v, a, t):
     axs[2].grid(True)
 
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    plt.savefig('cartesiano_joint.png')
     plt.show()
 
 def plot_trajectory_euclidean(pos, q, t):
