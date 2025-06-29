@@ -49,16 +49,12 @@ def traj_eucl(x_init, y_init, x_final, y_final, ds=0.01):
     pos = np.array(pos)
     t = np.arange(len(q)) * ds
 
-    # Plot usando a função do utils.py
-    plot_trajectory_euclidean(pos, q, t)
-
-    return q
+    return q, pos, t
 
 
 def main():
-	# Exemplo de uso da função traj_euclidean
-    q_traj = traj_eucl(0.1, 0.1, 1, 1, ds=0.01)
-    # print(q_traj)
+    q_traj, pos_traj, t_traj = traj_eucl(0.1, 0.1, 1, 1, ds=0.01)
+    plot_trajectory_euclidean(pos_traj, q_traj, t_traj)
 
 if __name__ == "__main__":
     main()
