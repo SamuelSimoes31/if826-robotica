@@ -1,16 +1,7 @@
 import math as mt
-from kinematics import ik
+from _2_kinematics import ik
 import matplotlib.pyplot as plt
 import numpy as np
-
-import numpy as np
-import matplotlib.pyplot as plt
-
-import numpy as np
-import matplotlib.pyplot as plt
-
-import numpy as np
-import matplotlib.pyplot as plt
 
 def traj_euclidean(x_init, y_init, x_final, y_final, ds=0.01):
     init_final = [[x_init, x_final], [y_init, y_final]]

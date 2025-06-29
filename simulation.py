@@ -1,6 +1,6 @@
 import roboticstoolbox as rtb
 import numpy as np
-from kinematics import traj_joint, traj_euclidean
+from _2_kinematics import traj_joint, traj_euclidean
 
 # Create the RR robot object
 robot = rtb.models.DH.Planar2()
