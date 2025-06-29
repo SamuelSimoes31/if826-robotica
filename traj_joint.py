@@ -1,28 +1,10 @@
 import numpy as np
 import math as mt
-from atv1_sssf2_tcsr import *
+from _1_transformation_matrix import *
 from utils import plotar_series_temporais_completo
 a1 = a2 = 1
 vmax = 10  # graus/s
 amax = 10  # graus/s^2
-
-# Jacobiano inverso (com verificação de singularidade)
-def inverse_jacobian(q1, q2):
-    sin_q2 = mt.sin(q2)
-    if abs(sin_q2) < 1e-6:
-        raise ValueError("Jacobian is singular (q2 ≈ 0), cannot invert.")
-
-    denom = a1 * a2 * sin_q2
-    return (1 / denom) * np.array(
-        [
-            [a2 * mt.cos(q1 + q2), a2 * mt.sin(q1 + q2)],
-            [
-                -a1 * mt.cos(q1) - a2 * mt.cos(q1 + q2),
-                -a1 * mt.sin(q1) - a2 * mt.sin(q1 + q2),
-            ],
-        ]
-    )
-
 
 def calculate_trajectory_params(init, final, v_max, a_max):
     s_total = abs(final - init)
