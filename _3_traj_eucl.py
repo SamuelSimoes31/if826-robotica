@@ -3,7 +3,7 @@ from _2_kinematics import ik
 import matplotlib.pyplot as plt
 import numpy as np
 
-def traj_euclidean(x_init, y_init, x_final, y_final, ds=0.01):
+def traj_eucl(x_init, y_init, x_final, y_final, ds=0.01):
     init_final = [[x_init, x_final], [y_init, y_final]]
     dist_axis = [abs(x_final - x_init), abs(y_final - y_init)]
     dist_sync = max(dist_axis[0], dist_axis[1])

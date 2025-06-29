@@ -1,13 +1,13 @@
 import roboticstoolbox as rtb
-from traj_eucl import traj_euclidean
-from traj_joint import traj_joint
+from _3_traj_eucl import traj_eucl
+from _3_traj_joint import traj_joint
 import numpy as np
 
 # Create the RR robot object
 robot = rtb.models.DH.Planar2()
 
 # Exemplo de trajetória euclideana
-# q_traj_eucl = traj_euclidean(0, 0, 0, 0.5, ds=0.01)
+# q_traj_eucl = traj_eucl(0, 0, 0, 0.5, ds=0.01)
 
 
 # Exemplo de trajetória articular
