@@ -11,9 +11,11 @@ def SE2_xy(Dx,Dy):
 
 def SE2_theta(DthetaDeg):
     DthetaRad = np.deg2rad(DthetaDeg)
+    cos = mt.cos(DthetaRad)
+    sin = mt.sin(DthetaRad)
     return np.array([
-        [mt.cos(DthetaRad), -mt.sin(DthetaRad), 0],
-        [mt.sin(DthetaRad), mt.cos(DthetaRad), 0],
+        [cos, -sin, 0],
+        [sin, cos, 0],
         [0, 0, 1]
     ])
 
