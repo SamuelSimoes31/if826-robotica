@@ -27,14 +27,8 @@ def pretty_matrix_multiplication(A, H, P):
 
     print(output)
 
-# --- Função para imprimir do jeito que você quer ---
 def imprimir_simples(matriz: np.ndarray):
-    """
-    Imprime a matriz no formato '0.00, 0.00', linha por linha.
-    """
     for linha in matriz:
-        # Formata cada número com 2 casas decimais (: .2f)
-        # e une com ', '
         print(f"{linha[0]:.2f}, {linha[1]:.2f}")
 
 # --- Função para plotar o gráfico ---
@@ -45,7 +39,7 @@ def plotar_series_temporais(matriz: np.ndarray):
     """
     # Pega o número de linhas (pontos no tempo)
     num_linhas = matriz.shape[0]
-    
+
     # Cria o eixo do tempo 't' (ex: [0, 1, 2, ..., n-1])
     t = np.arange(num_linhas)
 
@@ -56,7 +50,7 @@ def plotar_series_temporais(matriz: np.ndarray):
     # --- Cria a figura com 2 subplots (2 linhas, 1 coluna) ---
     # sharex=True faz com que os dois gráficos usem o mesmo eixo X (tempo)
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
-    
+
     fig.suptitle('Dados da Matriz em Função do Tempo (t)', fontsize=16)
 
     # Gráfico 1: Coluna 0 vs. Tempo
@@ -74,20 +68,15 @@ def plotar_series_temporais(matriz: np.ndarray):
 
     # Ajusta o layout para evitar sobreposição de títulos
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-    
-    # Salva a imagem em um arquivo
     plt.savefig('grafico_duplo.png')
-    
-    # Exibe o gráfico
     plt.show()
-    
+
 
 def plotar_series_temporais_completo(q, v, a, t):
-    """Sua função de plotar melhorada."""
     q_deg = np.rad2deg(q)
     v_deg = np.rad2deg(v)
     a_deg = np.rad2deg(a)
-    
+
     fig, axs = plt.subplots(3, 1, figsize=(10, 12), sharex=True)
     fig.suptitle('Perfil da Trajetória Sincronizada no Espaço de Juntas', fontsize=16)
 
@@ -109,6 +98,44 @@ def plotar_series_temporais_completo(q, v, a, t):
     axs[2].set_xlabel('Tempo (s)')
     axs[2].legend()
     axs[2].grid(True)
-    
+
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    plt.show()
+
+def plot_trajectory_euclidean(pos, q, t):
+    """
+    Plota a trajetória euclidiana com dois gráficos lado a lado:
+    1. Trajetória no espaço cartesiano (XY)
+    2. Ângulos das juntas ao longo do tempo
+
+    Args:
+        pos: array com posições [x, y] do end-effector
+        q: array com ângulos das juntas [θ1, θ2]
+        t: array com tempos
+    """
+    # === PLOT: Dois gráficos lado a lado ===
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+
+    # 1. Trajetória no espaço cartesiano
+    axes[0].plot(pos[:, 0], pos[:, 1], 'b-', linewidth=2, label='Trajetória XY')
+    axes[0].scatter(pos[0, 0], pos[0, 1], color='green', label='Início')
+    axes[0].scatter(pos[-1, 0], pos[-1, 1], color='red', label='Fim')
+    axes[0].set_xlabel('X (m)')
+    axes[0].set_ylabel('Y (m)')
+    axes[0].set_title('Trajetória do End-Effector')
+    axes[0].axis('equal')
+    axes[0].grid(True)
+    axes[0].legend()
+
+    # 2. Ângulos das juntas ao longo do tempo
+    axes[1].plot(t, np.degrees(q[:, 0]), label='Junta 1 (θ1)')
+    axes[1].plot(t, np.degrees(q[:, 1]), label='Junta 2 (θ2)')
+    axes[1].set_xlabel('Tempo (s)')
+    axes[1].set_ylabel('Ângulo (graus)')
+    axes[1].set_title('Movimento das Juntas')
+    axes[1].grid(True)
+    axes[1].legend()
+
+    plt.tight_layout()
+    plt.savefig('cartesiano_eucl.png')
     plt.show()

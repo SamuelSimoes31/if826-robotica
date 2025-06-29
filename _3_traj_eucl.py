@@ -2,6 +2,7 @@ import math as mt
 from _2_kinematics import ik
 import matplotlib.pyplot as plt
 import numpy as np
+from utils import plot_trajectory_euclidean
 
 def traj_eucl(x_init, y_init, x_final, y_final, ds=0.01):
     init_final = [[x_init, x_final], [y_init, y_final]]
@@ -48,38 +49,15 @@ def traj_eucl(x_init, y_init, x_final, y_final, ds=0.01):
     pos = np.array(pos)
     t = np.arange(len(q)) * ds
 
-    # === PLOT: Dois gráficos lado a lado ===
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-
-    # 1. Trajetória no espaço cartesiano
-    axes[0].plot(pos[:, 0], pos[:, 1], 'b-', linewidth=2, label='Trajetória XY')
-    axes[0].scatter(pos[0, 0], pos[0, 1], color='green', label='Início')
-    axes[0].scatter(pos[-1, 0], pos[-1, 1], color='red', label='Fim')
-    axes[0].set_xlabel('X (m)')
-    axes[0].set_ylabel('Y (m)')
-    axes[0].set_title('Trajetória do End-Effector')
-    axes[0].axis('equal')
-    axes[0].grid(True)
-    axes[0].legend()
-
-    # 2. Ângulos das juntas ao longo do tempo
-    axes[1].plot(t, (q[:, 0]), label='Junta 1 (θ1)')
-    axes[1].plot(t, (q[:, 1]), label='Junta 2 (θ2)')
-    axes[1].set_xlabel('Tempo (s)')
-    axes[1].set_ylabel('Ângulo (rad)')
-    axes[1].set_title('Movimento das Juntas')
-    axes[1].grid(True)
-    axes[1].legend()
-
-    plt.tight_layout()
-    plt.show()
+    # Plot usando a função do utils.py
+    plot_trajectory_euclidean(pos, q, t)
 
     return q
 
 
 def main():
 	# Exemplo de uso da função traj_euclidean
-    q_traj = traj_euclidean(0.1, 0.1, 1, 1, ds=0.01)
+    q_traj = traj_eucl(0.1, 0.1, 1, 1, ds=0.01)
     # print(q_traj)
 
 if __name__ == "__main__":
